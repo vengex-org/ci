@@ -42,10 +42,15 @@ jobs:
     secrets:
       PACKAGES_TOKEN: ${{ secrets.VENGEX_PACKAGES_TOKEN }}
       COOLIFY_READ_TOKEN: ${{ secrets.COOLIFY_READ_TOKEN }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 ```
 
-`COOLIFY_TOKEN` and `SENTRY_AUTH_TOKEN` are not passed here. The `release` job runs in the deploy
-environment and reads them from that environment's secrets.
+The deploy tokens have to be repository secrets. A job of a workflow called from another repository
+cannot read the caller's environment secrets, so they cannot be scoped to an environment. The
+`release` job uses them only for pushes and dispatches on master; the `build` job of a pull request
+never receives them. Anyone who can open a pull request in the repository could still change the
+calling workflow to read them, as with any repository secret.
 
 What one run does:
 
@@ -120,8 +125,6 @@ this block, with no workflow change:
 
 - Every deploy environment exists under Settings > Environments, and its deployment branches are
   limited to `master`.
-- `COOLIFY_TOKEN` and `SENTRY_AUTH_TOKEN` exist only as environment secrets. Delete any
-  repository-level copy: a pull request run can read repository secrets.
 - `PACKAGES_TOKEN` is a read-only token for the `@vengex-org` packages. Pull requests from the
   repository run their own install scripts and Nx targets with it, so it must not grant more.
 - `COOLIFY_READ_TOKEN` is a repository secret holding a read-only Coolify token. Without it, the

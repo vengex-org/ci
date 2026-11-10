@@ -55,11 +55,13 @@ on:
       COOLIFY_READ_TOKEN:
         description: Read-only Coolify token for the pull request preflight
         required: false
-      # Declared but never passed by the caller: the `release` job runs in the deploy environment, where
-      # GitHub takes them from that environment's secrets, which pull request runs cannot read.
+      # A job of a workflow called from another repository does not see the caller's environment
+      # secrets (verified on vengex-org/ci-fixture), so the caller passes these from repository secrets.
       COOLIFY_TOKEN:
+        description: Coolify deploy token, used only by the release job
         required: false
       SENTRY_AUTH_TOKEN:
+        description: Source map upload in release builds
         required: false
 
 permissions: {}

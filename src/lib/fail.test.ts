@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as core from "@actions/core"
+import { z } from "zod"
 import { fail } from "./fail"
 
 afterEach(() => {
@@ -41,5 +42,16 @@ describe("fail", () => {
     expect(failures).toEqual(["plain string"])
     expect(errors).toEqual([])
     expect(process.exitCode).toBe(1)
+  })
+
+  test("names the failing field of an environment parse instead of printing issues as JSON", () => {
+    const parsed = z.object({ COOLIFY_TOKEN: z.string().min(1) }).safeParse({ COOLIFY_TOKEN: "" })
+    if (parsed.success) throw new Error("expected the empty token to be rejected")
+
+    const { failures } = failing(parsed.error)
+
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toContain("COOLIFY_TOKEN")
+    expect(failures[0]?.startsWith("[")).toBe(false)
   })
 })
