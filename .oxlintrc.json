@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import"],
+  "categories": { "correctness": "error", "suspicious": "warn", "pedantic": "off" },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "no-console": ["error", { "allow": ["error", "warn", "info"] }]
+  }
+}
