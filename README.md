@@ -19,11 +19,13 @@ on:
     inputs:
       environment:
         description: Environment to redeploy from master
-        type: string
+        type: choice
+        options: [staging, production]
         required: true
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # The event is part of the group, so a push never replaces a pending production dispatch.
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -42,14 +44,15 @@ jobs:
     secrets:
       PACKAGES_TOKEN: ${{ secrets.VENGEX_PACKAGES_TOKEN }}
       COOLIFY_READ_TOKEN: ${{ secrets.COOLIFY_READ_TOKEN }}
-      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # Only runs on master (push or dispatch) deploy; pull requests and other refs get no deploy token.
+      COOLIFY_TOKEN: ${{ github.ref == 'refs/heads/master' && secrets.COOLIFY_TOKEN || '' }}
+      SENTRY_AUTH_TOKEN: ${{ github.ref == 'refs/heads/master' && secrets.SENTRY_AUTH_TOKEN || '' }}
 ```
 
 The deploy tokens have to be repository secrets. A job of a workflow called from another repository
 cannot read the caller's environment secrets, so they cannot be scoped to an environment. The
-`release` job uses them only for pushes and dispatches on master; the `build` job of a pull request
-never receives them. Anyone who can open a pull request in the repository could still change the
+`release` job uses them only for pushes and dispatches on master, and the caller above does not
+pass them to pull request runs. Anyone who can open a pull request in the repository could still change the
 calling workflow to read them, as with any repository secret.
 
 What one run does:
@@ -76,7 +79,9 @@ Environments:
 
 A fork pull request gets no secrets, so it builds no image. A deploy is never cancelled halfway.
 
-Inputs are listed with their defaults in `.github/workflows/nx-pipeline.yml`. The timeouts must
+Inputs are listed with their defaults in `.github/workflows/nx-pipeline.yml`. The caller's `permissions` are the most any job may get: each job of the pipeline asks only for
+what it needs, so a pull request run never writes. A dispatch from a branch other than master fails
+in `prepare`. The timeouts must
 nest: `wait-timeout` must be greater than `checks-timeout`, and `release-timeout` must be at least
 `build + wait + deploy`. `prepare` fails when they do not.
 
