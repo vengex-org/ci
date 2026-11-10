@@ -68,6 +68,9 @@ permissions: {}
 
 env:
   DOCKER_BUILD_RECORD_UPLOAD: false
+  # Nx 24 keeps its cache in a per-user directory outside the checkout; here it belongs in the
+  # checkout so actions/cache can save and restore it.
+  NX_CACHE_DIRECTORY: .nx/cache
 
 jobs:
   prepare:
@@ -155,7 +158,8 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .ci
           persist-credentials: false
-      - uses: $/actions/setup
+      - id: setup
+        uses: $/actions/setup
         with:
           install-repo: "true"
           packages-token: ${{ secrets.PACKAGES_TOKEN || github.token }}
@@ -195,6 +199,11 @@ jobs:
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: github.event_name != 'pull_request' && steps.setup.outputs.bun-cache-hit != 'true'
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.setup.outputs.bun-cache-key }}
 
   # Pull requests from this repo: build each affected image without pushing, and read the Coolify
   # resources it would deploy to. Read permissions and read tokens only.

@@ -10,6 +10,13 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  bun-cache-key:
+    description: Key of the bun install cache; a job that installs saves it under this key on a miss.
+    value: ${{ steps.bun-cache.outputs.cache-primary-key }}
+  bun-cache-hit:
+    value: ${{ steps.bun-cache.outputs.cache-hit }}
+
 runs:
   using: composite
   steps:
@@ -17,7 +24,8 @@ runs:
       with:
         bun-version-file: package.json
 
-    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    - id: bun-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', '.ci/bun.lock') }}
