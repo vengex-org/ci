@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { failureOf } from "../lib/failure-of"
-import { type WaitForChecksDeps, type WaitForChecksInput, waitForChecks } from "./wait-for-checks"
+import {
+  CHECKS_JOB_NAME,
+  type WaitForChecksDeps,
+  type WaitForChecksInput,
+  waitForChecks,
+} from "./wait-for-checks"
 
 const input: WaitForChecksInput = {
   repo: "vengex-org/axman",
@@ -46,7 +51,7 @@ function harness(replies: Reply[]) {
 
 describe("waitForChecks", () => {
   test("resolves when the checks job succeeded and asks for this run attempt with the token", async () => {
-    const { deps, calls } = harness([jobsReply([done("checks", "success")])])
+    const { deps, calls } = harness([jobsReply([done(CHECKS_JOB_NAME, "success")])])
     await waitForChecks(input, deps)
     expect(calls).toHaveLength(1)
     expect(calls[0]?.url).toBe(
@@ -55,33 +60,42 @@ describe("waitForChecks", () => {
     expect(calls[0]?.headers.Authorization).toBe("Bearer secret-token")
   })
 
-  test("matches a reusable workflow job named '<caller job> / checks'", async () => {
+  test("matches a reusable workflow job named '<caller job> / pipeline-checks'", async () => {
     const { deps } = harness([
-      jobsReply([done("pipeline / plan", "success"), done("pipeline / checks", "success")]),
+      jobsReply([
+        done("pipeline / plan", "success"),
+        done(`pipeline / ${CHECKS_JOB_NAME}`, "success"),
+      ]),
     ])
     await waitForChecks(input, deps)
   })
 
-  test("ignores jobs that only contain the word checks", async () => {
-    const { deps } = harness([
-      jobsReply([done("prechecks", "failure"), done("a / precheck", "failure")], 2),
-      jobsReply([done("prechecks", "failure"), done("checks", "success")]),
+  test("ignores jobs that only contain the job name, including the old name checks", async () => {
+    const { deps, calls } = harness([
+      jobsReply([
+        done(`pre${CHECKS_JOB_NAME}`, "failure"),
+        done("checks", "failure"),
+        done("a / checks", "failure"),
+        done(`a / ${CHECKS_JOB_NAME}x`, "failure"),
+      ]),
+      jobsReply([done(`pre${CHECKS_JOB_NAME}`, "failure"), done(CHECKS_JOB_NAME, "success")]),
     ])
     await waitForChecks(input, deps)
+    expect(calls).toHaveLength(2)
   })
 
   test("keeps polling while the checks job is in progress", async () => {
     const { deps, calls } = harness([
-      jobsReply([{ name: "checks", status: "in_progress", conclusion: null }]),
-      jobsReply([{ name: "checks", status: "queued", conclusion: null }]),
-      jobsReply([done("checks", "success")]),
+      jobsReply([{ name: CHECKS_JOB_NAME, status: "in_progress", conclusion: null }]),
+      jobsReply([{ name: CHECKS_JOB_NAME, status: "queued", conclusion: null }]),
+      jobsReply([done(CHECKS_JOB_NAME, "success")]),
     ])
     await waitForChecks(input, deps)
     expect(calls).toHaveLength(3)
   })
 
   test("keeps polling while the checks job does not exist yet", async () => {
-    const { deps, calls } = harness([jobsReply([]), jobsReply([done("checks", "success")])])
+    const { deps, calls } = harness([jobsReply([]), jobsReply([done(CHECKS_JOB_NAME, "success")])])
     await waitForChecks(input, deps)
     expect(calls).toHaveLength(2)
   })
@@ -96,19 +110,22 @@ describe("waitForChecks", () => {
     "stale",
   ]) {
     test(`throws naming the conclusion ${conclusion}`, async () => {
-      const { deps } = harness([jobsReply([done("checks", conclusion)])])
+      const { deps } = harness([jobsReply([done(CHECKS_JOB_NAME, conclusion)])])
       expect(await failureOf(waitForChecks(input, deps))).toContain(`concluded ${conclusion}`)
     })
   }
 
   test("throws when a completed checks job has no conclusion", async () => {
-    const { deps } = harness([jobsReply([done("checks", null)])])
+    const { deps } = harness([jobsReply([done(CHECKS_JOB_NAME, null)])])
     expect(await failureOf(waitForChecks(input, deps))).toContain("without a conclusion")
   })
 
   test("throws when more than one job matches", async () => {
     const { deps } = harness([
-      jobsReply([done("a / checks", "success"), done("b / checks", "success")]),
+      jobsReply([
+        done(`a / ${CHECKS_JOB_NAME}`, "success"),
+        done(`b / ${CHECKS_JOB_NAME}`, "success"),
+      ]),
     ])
     expect(await failureOf(waitForChecks(input, deps))).toContain("more than one checks job")
   })
@@ -120,7 +137,7 @@ describe("waitForChecks", () => {
 
   test("throws on timeout and names what it was waiting for", async () => {
     const { deps, calls } = harness([
-      jobsReply([{ name: "checks", status: "in_progress", conclusion: null }]),
+      jobsReply([{ name: CHECKS_JOB_NAME, status: "in_progress", conclusion: null }]),
     ])
     expect(await failureOf(waitForChecks(input, deps))).toContain(
       "timed out after 1000 ms waiting for the checks job (checks job is in_progress)",
@@ -132,7 +149,7 @@ describe("waitForChecks", () => {
     const { deps, calls } = harness([
       { status: 502 },
       { status: 429 },
-      jobsReply([done("checks", "success")]),
+      jobsReply([done(CHECKS_JOB_NAME, "success")]),
     ])
     await waitForChecks(input, deps)
     expect(calls).toHaveLength(3)
@@ -145,7 +162,7 @@ describe("waitForChecks", () => {
 
   for (const status of [401, 403, 404, 422]) {
     test(`fails fast on ${status}`, async () => {
-      const { deps, calls } = harness([{ status }, jobsReply([done("checks", "success")])])
+      const { deps, calls } = harness([{ status }, jobsReply([done(CHECKS_JOB_NAME, "success")])])
       expect(await failureOf(waitForChecks(input, deps))).toContain(`answered ${status}`)
       expect(calls).toHaveLength(1)
     })

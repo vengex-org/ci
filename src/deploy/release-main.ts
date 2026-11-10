@@ -1,12 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises"
 import * as core from "@actions/core"
 import { z } from "zod"
-import type { Leg } from "../plan/plan"
-import { COOLIFY_DEPLOY_BUDGET_MS, COOLIFY_POLL_INTERVAL_MS, deployImage } from "./coolify"
+import { minutes } from "../inputs/pipeline-inputs"
+import { fail } from "../lib/fail"
+import { type Leg, parseLeg } from "../plan/leg"
+import { COOLIFY_POLL_INTERVAL_MS, deployImage } from "./coolify"
 import { moveDeployedTag } from "./deployed-tag"
 import { checkHealth } from "./health"
 import type { HttpFetch } from "./http-fetch"
-import { parseLeg } from "./leg-schema"
 
 const envSchema = z.object({
   LEG_JSON: z.string().min(1),
@@ -15,11 +16,7 @@ const envSchema = z.object({
   GITHUB_TOKEN: z.string().min(1),
   GITHUB_REPOSITORY: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
   GITHUB_SHA: z.string().regex(/^[0-9a-f]{40}$/),
-  // An unset workflow variable arrives as an empty string.
-  COOLIFY_DEPLOY_TIMEOUT_MINUTES: z.preprocess(
-    (value) => (value === "" ? undefined : value),
-    z.coerce.number().positive().finite().optional(),
-  ),
+  COOLIFY_DEPLOY_TIMEOUT_MINUTES: minutes,
 })
 
 export type ReleaseConfig = {
@@ -80,7 +77,6 @@ export async function releaseLeg(
 
 async function main(): Promise<void> {
   const env = envSchema.parse(process.env)
-  const minutes = env.COOLIFY_DEPLOY_TIMEOUT_MINUTES
   await releaseLeg(
     parseLeg(env.LEG_JSON),
     {
@@ -89,7 +85,7 @@ async function main(): Promise<void> {
       githubToken: env.GITHUB_TOKEN,
       repo: env.GITHUB_REPOSITORY,
       sha: env.GITHUB_SHA,
-      budgetMs: minutes === undefined ? COOLIFY_DEPLOY_BUDGET_MS : minutes * 60_000,
+      budgetMs: env.COOLIFY_DEPLOY_TIMEOUT_MINUTES * 60_000,
     },
     { fetch, sleep: (ms) => sleep(ms) },
   )
@@ -99,7 +95,6 @@ if (import.meta.main) {
   try {
     await main()
   } catch (error) {
-    core.setFailed(error instanceof Error ? error.message : String(error))
-    process.exit(1)
+    fail(error)
   }
 }

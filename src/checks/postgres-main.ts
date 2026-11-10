@@ -1,5 +1,6 @@
 import { setTimeout } from "node:timers/promises"
 import * as core from "@actions/core"
+import { fail } from "../lib/fail"
 import { parsePostgresInput } from "../inputs/pipeline-inputs"
 import { runCommand } from "../lib/run-command"
 import { startPostgres } from "./postgres"
@@ -19,6 +20,5 @@ try {
   })
   core.info(`postgres ${service.image} healthy on port ${service.port}`)
 } catch (error) {
-  core.setFailed(error instanceof Error ? error.message : String(error))
-  process.exitCode = 1
+  fail(error)
 }

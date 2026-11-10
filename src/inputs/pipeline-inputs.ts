@@ -5,7 +5,7 @@ import { strictRecord } from "./strict-record"
 export const ENVIRONMENT_TRIGGERS = ["auto", "manual"] as const
 export type EnvironmentTrigger = (typeof ENVIRONMENT_TRIGGERS)[number]
 
-const minutes = z.coerce.number().int().positive()
+export const minutes = z.coerce.number().int().positive()
 
 const jsonInput = <T extends z.ZodType>(schema: T) =>
   z
@@ -40,6 +40,10 @@ const rawInputsSchema = z
   .object({
     environments: jsonInput(strictRecord(refName, z.enum(ENVIRONMENT_TRIGGERS))),
     postgres: postgresInputSchema,
+    "coolify-url": z.union([
+      z.literal("").transform(() => undefined),
+      z.url({ protocol: /^https$/ }),
+    ]),
     "checks-timeout": minutes,
     "wait-timeout": minutes,
     "build-timeout": minutes,
@@ -47,6 +51,13 @@ const rawInputsSchema = z
     "release-timeout": minutes,
   })
   .superRefine((inputs, ctx) => {
+    if (Object.keys(inputs.environments).length > 0 && inputs["coolify-url"] === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["coolify-url"],
+        message: "required when environments declares at least one environment",
+      })
+    }
     if (inputs["wait-timeout"] <= inputs["checks-timeout"]) {
       ctx.addIssue({
         code: "custom",
@@ -68,6 +79,7 @@ export type PostgresService = z.infer<typeof postgresSchema>
 export type PipelineInputs = {
   environments: Record<string, EnvironmentTrigger>
   postgres: PostgresService | undefined
+  coolifyUrl: string | undefined
   timeouts: { checks: number; wait: number; build: number; deploy: number; release: number }
 }
 
@@ -83,6 +95,7 @@ export function parsePipelineInputs(raw: Record<string, string>): PipelineInputs
   return {
     environments: inputs.environments,
     postgres: inputs.postgres,
+    coolifyUrl: inputs["coolify-url"],
     timeouts: {
       checks: inputs["checks-timeout"],
       wait: inputs["wait-timeout"],

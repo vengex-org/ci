@@ -1,10 +1,9 @@
 import { z } from "zod"
 import type { HttpFetch } from "./http-fetch"
 
-// Same values as COOLIFY_DEPLOY_BUDGET_MS and COOLIFY_POLL_INTERVAL_MS in platform/tools/env.ts:
-// a first image pull, the API's migrations and the healthchecks' start periods add up, and a
-// deploy wrongly reported as timed out sends someone looking for a fault that is not there.
-export const COOLIFY_DEPLOY_BUDGET_MS = 900_000
+// Measured on the platform deploys: a first image pull, the API's migrations and the healthchecks'
+// start periods add up to about 900 s, so a deploy budget below that reports a timeout for a deploy
+// that is still healthy. A 5 s poll keeps the Coolify API calls few over that wait.
 export const COOLIFY_POLL_INTERVAL_MS = 5000
 
 /** The one status that means the build is up. */
@@ -42,12 +41,12 @@ export type DeployDeps = {
   budgetMs: number
 }
 
-/** A Coolify answer other than 2xx. The body stays in `cause`: it is never printed. */
+/** A Coolify answer other than 2xx. The body is not kept: it may echo the request. */
 export class CoolifyHttpError extends Error {
   readonly status: number
 
-  constructor(method: string, path: string, status: number, body: string) {
-    super(`coolify answered ${status} to ${method} ${path}`, { cause: { status, body } })
+  constructor(method: string, path: string, status: number) {
+    super(`coolify answered ${status} to ${method} ${path}`, { cause: { status, path } })
     this.status = status
   }
 }
@@ -173,12 +172,7 @@ async function coolifyRequest(
   })
 
   if (!response.ok) {
-    throw new CoolifyHttpError(
-      init.method ?? "GET",
-      path,
-      response.status,
-      (await response.text()).slice(0, 500),
-    )
+    throw new CoolifyHttpError(init.method ?? "GET", path, response.status)
   }
   return await response.json()
 }

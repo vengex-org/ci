@@ -1,6 +1,7 @@
 import * as core from "@actions/core"
 import { z } from "zod"
-import { parseBuildLeg, parseLeg } from "../deploy/leg-schema"
+import { fail } from "../lib/fail"
+import { parseBuildLeg, parseLeg } from "../plan/leg"
 import { readBunVersion, resolveBuildArgs } from "./build-args"
 
 try {
@@ -25,6 +26,5 @@ try {
     }),
   )
 } catch (error) {
-  core.setFailed(error instanceof Error ? error.message : String(error))
-  process.exitCode = 1
+  fail(error)
 }

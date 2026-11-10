@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { BuildLeg } from "../plan/plan"
+import type { BuildLeg } from "../plan/leg"
 import type { HttpFetch } from "./http-fetch"
 import { preflightLeg } from "./preflight-main"
 

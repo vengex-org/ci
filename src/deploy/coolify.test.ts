@@ -229,7 +229,7 @@ describe("deployImage", () => {
     ])
   })
 
-  test("keeps the refusal body in the cause and out of the message", async () => {
+  test("keeps the refusal body out of the error and the status and path in the cause", async () => {
     const { fetchImpl } = coolifyFake({
       reply: { deploy: Response.json({ message: "Unauthenticated." }, { status: 401 }) },
     })
@@ -243,7 +243,7 @@ describe("deployImage", () => {
     expect(error instanceof Error ? error.message : "").toContain("401")
     expect(error instanceof Error ? error.cause : undefined).toEqual({
       status: 401,
-      body: JSON.stringify({ message: "Unauthenticated." }),
+      path: "/deploy?uuid=api&force=true",
     })
   })
 

@@ -10,9 +10,9 @@ const validDeploy = {
   secrets: ["packages", "sentry"],
   environments: {
     staging: {
-      coolify: "gccw0cscggosw0os4gk8wg04",
+      coolify: "abc123coolifyapp456",
       buildArgs: { VITE_SERVER_URL: "${vars.STAGING_SERVER_URL}" },
-      health: { url: "https://staging.axman.sk/health", commit: true },
+      health: { url: "https://staging.example.com/health", commit: true },
     },
   },
 } satisfies DeployMetadata

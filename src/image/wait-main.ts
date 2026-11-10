@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises"
-import * as core from "@actions/core"
 import { z } from "zod"
+import { minutes } from "../inputs/pipeline-inputs"
+import { fail } from "../lib/fail"
 import { waitForChecks } from "./wait-for-checks"
 
 // Starting guess: the checks job runs for minutes, so 10 s keeps the API calls few.
@@ -11,7 +12,7 @@ const envSchema = z.object({
   GITHUB_REPOSITORY: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
   GITHUB_RUN_ID: z.string().regex(/^\d+$/),
   GITHUB_RUN_ATTEMPT: z.string().regex(/^\d+$/),
-  WAIT_TIMEOUT_MINUTES: z.coerce.number().positive().finite(),
+  WAIT_TIMEOUT_MINUTES: minutes,
 })
 
 try {
@@ -27,6 +28,5 @@ try {
     { fetch, sleep: (ms) => sleep(ms), now: () => Date.now(), token: env.GITHUB_TOKEN },
   )
 } catch (error) {
-  core.setFailed(error instanceof Error ? error.message : String(error))
-  process.exit(1)
+  fail(error)
 }

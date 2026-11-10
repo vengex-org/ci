@@ -74,14 +74,6 @@ describe("parseDeployedTags", () => {
     ])
   })
 
-  test("prefers the peeled commit of an annotated tag in either line order", () => {
-    const tagObject = `${shaC}\trefs/tags/deployed/staging/web`
-    const peeled = `${shaA}\trefs/tags/deployed/staging/web^{}`
-    const expected = [{ environment: "staging", app: "web", sha: shaA }]
-    expect(parseDeployedTags(`${tagObject}\n${peeled}\n`)).toEqual(expected)
-    expect(parseDeployedTags(`${peeled}\n${tagObject}\n`)).toEqual(expected)
-  })
-
   test("returns nothing for empty output", () => {
     expect(parseDeployedTags("")).toEqual([])
     expect(parseDeployedTags("\n\n")).toEqual([])

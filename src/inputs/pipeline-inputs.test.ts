@@ -4,6 +4,7 @@ import { parsePipelineInputs } from "./pipeline-inputs"
 const raw = {
   environments: '{"staging":"auto","production":"manual"}',
   postgres: "",
+  "coolify-url": "https://coolify.example.com",
   "checks-timeout": "30",
   "wait-timeout": "35",
   "build-timeout": "15",
@@ -16,13 +17,28 @@ describe("parsePipelineInputs", () => {
     expect(parsePipelineInputs(raw)).toEqual({
       environments: { staging: "auto", production: "manual" },
       postgres: undefined,
+      coolifyUrl: "https://coolify.example.com",
       timeouts: { checks: 30, wait: 35, build: 15, deploy: 15, release: 70 },
     })
   })
 
-  test("accepts a repo with no deploy environments", () => {
-    expect(parsePipelineInputs({ ...raw, environments: "{}" }).environments).toEqual({})
+  test("accepts a repo with no deploy environments and no coolify url", () => {
+    const inputs = parsePipelineInputs({ ...raw, environments: "{}", "coolify-url": "" })
+
+    expect(inputs.environments).toEqual({})
+    expect(inputs.coolifyUrl).toBeUndefined()
   })
+
+  test("requires the coolify url once an environment is declared", () => {
+    expect(() => parsePipelineInputs({ ...raw, "coolify-url": "" })).toThrow(/coolify-url/)
+  })
+
+  test.each(["http://coolify.example.com", "coolify.example.com", " "])(
+    "rejects coolify url %p",
+    (value) => {
+      expect(() => parsePipelineInputs({ ...raw, "coolify-url": value })).toThrow(/coolify-url/)
+    },
+  )
 
   test("parses the postgres service as one object", () => {
     const inputs = parsePipelineInputs({

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { Leg } from "../plan/plan"
+import type { Leg } from "../plan/leg"
 
 export type BuildArgsInput = {
   leg: Pick<Leg, "environment" | "buildArgs">

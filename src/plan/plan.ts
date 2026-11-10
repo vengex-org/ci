@@ -1,40 +1,16 @@
 import {
-  type BuildSecret,
   type Deployable,
   type EnvironmentDeploy,
-  type Platform,
   RUNNER_BY_PLATFORM,
 } from "../inputs/deploy-metadata"
 import type { EnvironmentTrigger } from "../inputs/pipeline-inputs"
+import type { BuildLeg, Leg } from "./leg"
 
 /** The event that started the run, narrowed from the GitHub context. */
 export type Trigger =
   | { event: "pull_request"; sameRepo: boolean }
   | { event: "push"; ref: string }
   | { event: "workflow_dispatch"; ref: string; environment: string }
-
-/** One image build (and, for a release, one deploy) of one app into one environment. */
-export type Leg = {
-  app: string
-  environment: string
-  project: string
-  image: string
-  /** `<environment>-<sha40>`, the tag pushed to ghcr and set on the Coolify resource. */
-  tag: string
-  dockerfile: string
-  context: string
-  platform: Platform
-  runner: (typeof RUNNER_BY_PLATFORM)[Platform]
-  prebuild: string | undefined
-  secrets: BuildSecret[]
-  buildArgs: EnvironmentDeploy["buildArgs"]
-  coolify: string
-  health: EnvironmentDeploy["health"]
-  reason: string
-}
-
-/** A pull request build: no push; the Coolify resources of every environment are checked read-only. */
-export type BuildLeg = Leg & { preflight: string[] }
 
 export type Skip = { app: string; environment: string; cause: string }
 

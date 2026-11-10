@@ -20,9 +20,9 @@ describe("resolveBuildArgs", () => {
   test("substitutes named vars inside a value", () => {
     const rendered = resolve(
       { VITE_URL: "https://${vars.HOST}/api/${vars.VERSION}" },
-      { HOST: "staging.axman.sk", VERSION: "v1" },
+      { HOST: "staging.example.com", VERSION: "v1" },
     )
-    expect(rendered.split("\n")).toContain("VITE_URL=https://staging.axman.sk/api/v1")
+    expect(rendered.split("\n")).toContain("VITE_URL=https://staging.example.com/api/v1")
   })
 
   test("keeps a literal value without placeholders", () => {

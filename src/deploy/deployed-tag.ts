@@ -12,25 +12,15 @@ export async function moveDeployedTag(
 ): Promise<void> {
   const { repo, environment, app, sha, token } = input
   const tag = `deployed/${environment}/${app}`
-  const update = await github(
-    token,
-    "PATCH",
-    `/repos/${repo}/git/refs/tags/${tag}`,
-    { sha, force: true },
-    fetch,
-  )
+  const updatePath = `/repos/${repo}/git/refs/tags/${tag}`
+  const update = await github(token, "PATCH", updatePath, { sha, force: true }, fetch)
 
   if (update.ok) return
-  if (!(await isMissingRef(update))) throw await githubError("PATCH", update)
+  if (!(await isMissingRef(update))) throw githubError("PATCH", updatePath, update)
 
-  const create = await github(
-    token,
-    "POST",
-    `/repos/${repo}/git/refs`,
-    { ref: `refs/tags/${tag}`, sha },
-    fetch,
-  )
-  if (!create.ok) throw await githubError("POST", create)
+  const createPath = `/repos/${repo}/git/refs`
+  const create = await github(token, "POST", createPath, { ref: `refs/tags/${tag}`, sha }, fetch)
+  if (!create.ok) throw githubError("POST", createPath, create)
 }
 
 /** GitHub answers an update of a missing ref with 404, or with 422 "Reference does not exist". */
@@ -59,8 +49,9 @@ async function github(
   })
 }
 
-async function githubError(method: string, response: Response): Promise<Error> {
+/** The answer's body is left out of the error: GitHub can echo request data into it. */
+function githubError(method: string, path: string, response: Response): Error {
   return new Error(`github answered ${response.status} to ${method} of the deployed tag`, {
-    cause: { status: response.status, body: (await response.text()).slice(0, 500) },
+    cause: { status: response.status, path },
   })
 }

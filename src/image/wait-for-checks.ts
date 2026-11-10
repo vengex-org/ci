@@ -19,6 +19,9 @@ export type WaitForChecksDeps = {
   token: string
 }
 
+/** The checks job of the reusable workflow; a caller's job name prefixes it as `<caller job> / <name>`. */
+export const CHECKS_JOB_NAME = "pipeline-checks"
+
 const JOBS_PER_PAGE = 100
 
 const jobsSchema = z.object({
@@ -31,8 +34,8 @@ const jobsSchema = z.object({
 type Job = z.infer<typeof jobsSchema>["jobs"][number]
 
 /**
- * Resolves when the `checks` job of this run attempt succeeded, so the image push never races ahead
- * of the checks. A reusable workflow names its jobs `<caller job> / checks`.
+ * Resolves when the {@link CHECKS_JOB_NAME} job of this run attempt succeeded, so the image push
+ * never races ahead of the checks.
  */
 export async function waitForChecks(
   input: WaitForChecksInput,
@@ -89,5 +92,5 @@ function jobsUrl({ repo, runId, runAttempt }: WaitForChecksInput): string {
 }
 
 function isChecksJob(job: Job): boolean {
-  return job.name === "checks" || job.name.endsWith(" / checks")
+  return job.name === CHECKS_JOB_NAME || job.name.endsWith(` / ${CHECKS_JOB_NAME}`)
 }

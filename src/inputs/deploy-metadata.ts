@@ -14,21 +14,25 @@ export const RUNNER_BY_PLATFORM = {
 export const BUILD_SECRETS = ["packages", "sentry"] as const
 export type BuildSecret = (typeof BUILD_SECRETS)[number]
 
+export const coolifyId = z.string().regex(/^[a-z0-9]+$/)
+export const buildArgName = z.string().regex(/^[A-Z_][A-Z0-9_]*$/)
+export const healthCheck = z
+  .object({ url: z.url({ protocol: /^https$/ }), commit: z.boolean() })
+  .strict()
+export const imageName = z.string().regex(/^ghcr\.io\/[a-z0-9-]+\/[a-z0-9._-]+$/)
+
 const environmentDeploySchema = z
   .object({
-    coolify: z.string().regex(/^[a-z0-9]+$/),
-    buildArgs: strictRecord(z.string().regex(/^[A-Z_][A-Z0-9_]*$/), z.string()).default({}),
-    health: z
-      .object({ url: z.url({ protocol: /^https$/ }), commit: z.boolean() })
-      .strict()
-      .optional(),
+    coolify: coolifyId,
+    buildArgs: strictRecord(buildArgName, z.string()).default({}),
+    health: healthCheck.optional(),
   })
   .strict()
 
 const deployMetadataSchema = z
   .object({
     name: refName,
-    image: z.string().regex(/^ghcr\.io\/[a-z0-9-]+\/[a-z0-9._-]+$/),
+    image: imageName,
     dockerfile: z.string().min(1),
     context: z.string().min(1),
     platform: z.enum(PLATFORMS),

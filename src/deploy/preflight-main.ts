@@ -1,9 +1,9 @@
 import * as core from "@actions/core"
 import { z } from "zod"
-import type { BuildLeg } from "../plan/plan"
+import { fail } from "../lib/fail"
+import { type BuildLeg, parseBuildLeg } from "../plan/leg"
 import { preflightCoolify } from "./coolify"
 import type { HttpFetch } from "./http-fetch"
-import { parseBuildLeg } from "./leg-schema"
 
 const envSchema = z.object({
   LEG_JSON: z.string().min(1),
@@ -49,7 +49,6 @@ if (import.meta.main) {
       process.exit(code)
     }
   } catch (error) {
-    core.setFailed(error instanceof Error ? error.message : String(error))
-    process.exit(1)
+    fail(error)
   }
 }

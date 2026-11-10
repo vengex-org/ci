@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { failureOf } from "../lib/failure-of"
-import type { Leg } from "../plan/plan"
+import type { Leg } from "../plan/leg"
 import type { HttpFetch } from "./http-fetch"
 import { type ReleaseConfig, releaseLeg } from "./release-main"
 

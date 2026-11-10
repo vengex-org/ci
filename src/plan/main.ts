@@ -1,13 +1,17 @@
 import * as core from "@actions/core"
-import { z } from "zod"
 import { readDeployables } from "../inputs/deploy-metadata"
 import { parsePipelineInputs } from "../inputs/pipeline-inputs"
+import { fail } from "../lib/fail"
+import { requireEnv } from "../lib/require-env"
 import { runCheck, runCommand } from "../lib/run-command"
-import { type Plan, type PlanDeps, type Trigger, planRun } from "./plan"
+import { gitDeps, projectNames } from "./git-deps"
+import { type Plan, planRun } from "./plan"
+import { readTrigger } from "./trigger"
 
 const INPUT_ENV_BY_KEY = {
   environments: "PIPELINE_INPUT_ENVIRONMENTS",
   postgres: "PIPELINE_INPUT_POSTGRES",
+  "coolify-url": "PIPELINE_INPUT_COOLIFY_URL",
   "checks-timeout": "PIPELINE_INPUT_CHECKS_TIMEOUT",
   "wait-timeout": "PIPELINE_INPUT_WAIT_TIMEOUT",
   "build-timeout": "PIPELINE_INPUT_BUILD_TIMEOUT",
@@ -15,93 +19,32 @@ const INPUT_ENV_BY_KEY = {
   "release-timeout": "PIPELINE_INPUT_RELEASE_TIMEOUT",
 } as const
 
-const projectNames = z.array(z.string())
-
 try {
   await main()
 } catch (error) {
-  core.setFailed(error instanceof Error ? error.message : String(error))
-  process.exitCode = 1
+  fail(error)
 }
 
 async function main(): Promise<void> {
-  const sha = requireEnv("GITHUB_SHA")
+  const sha = requireEnv("GITHUB_SHA", process.env)
   const inputs = parsePipelineInputs(
     Object.fromEntries(
-      Object.entries(INPUT_ENV_BY_KEY).map(([key, name]) => [key, requireEnv(name)]),
+      Object.entries(INPUT_ENV_BY_KEY).map(([key, name]) => [key, requireEnv(name, process.env)]),
     ),
   )
-  const graph: unknown = await Bun.file(requireEnv("NX_GRAPH_FILE")).json()
-  const affected: unknown = JSON.parse(requireEnv("NX_AFFECTED_JSON"))
+  const graph: unknown = await Bun.file(requireEnv("NX_GRAPH_FILE", process.env)).json()
+  const affected: unknown = JSON.parse(requireEnv("NX_AFFECTED_JSON", process.env))
   const plan = await planRun(
     {
-      trigger: readTrigger(),
+      trigger: readTrigger(process.env),
       sha,
       environments: inputs.environments,
       deployables: readDeployables(graph),
       affected: projectNames.parse(affected),
     },
-    gitDeps(sha),
+    gitDeps(sha, { runCommand, runCheck }),
   )
   await report(plan)
-}
-
-function readTrigger(): Trigger {
-  const event = requireEnv("GITHUB_EVENT_NAME")
-  switch (event) {
-    case "pull_request":
-      return { event, sameRepo: requireEnv("SAME_REPO") === "true" }
-    case "push":
-      return { event, ref: requireEnv("GITHUB_REF") }
-    case "workflow_dispatch":
-      return {
-        event,
-        ref: requireEnv("GITHUB_REF"),
-        environment: requireEnv("DISPATCH_ENVIRONMENT"),
-      }
-    default:
-      throw new Error(`unsupported event ${event}`)
-  }
-}
-
-function gitDeps(sha: string): PlanDeps {
-  const affectedByBase = new Map<string, Promise<Set<string>>>()
-  return {
-    async deployedCommit(environment, app) {
-      const command: [string, ...string[]] = [
-        "git",
-        "rev-parse",
-        "-q",
-        "--verify",
-        `refs/tags/deployed/${environment}/${app}^{commit}`,
-      ]
-      return (await runCheck(command)) ? (await runCommand(command)).trim() : undefined
-    },
-    isAncestor: (ancestor, descendant) =>
-      runCheck(["git", "merge-base", "--is-ancestor", ancestor, descendant]),
-    async isAffectedSince(base, project) {
-      const affected = affectedByBase.get(base) ?? affectedProjects(base, sha)
-      affectedByBase.set(base, affected)
-      return (await affected).has(project)
-    },
-  }
-}
-
-async function affectedProjects(base: string, head: string): Promise<Set<string>> {
-  const output = await runCommand([
-    "bunx",
-    "nx",
-    "show",
-    "projects",
-    "--affected",
-    "--base",
-    base,
-    "--head",
-    head,
-    "--json",
-  ])
-  const projects: unknown = JSON.parse(output)
-  return new Set(projectNames.parse(projects))
 }
 
 async function report(plan: Plan): Promise<void> {
@@ -121,10 +64,4 @@ async function report(plan: Plan): Promise<void> {
       ...plan.skipped.map((skipped) => ["skip", skipped.app, skipped.environment, skipped.cause]),
     ])
     .write()
-}
-
-function requireEnv(name: string): string {
-  const value = process.env[name]
-  if (value === undefined) throw new Error(`environment variable ${name} is not set`)
-  return value
 }

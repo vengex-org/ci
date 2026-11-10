@@ -89,7 +89,7 @@ describe("moveDeployedTag", () => {
     expect(calls).toHaveLength(1)
   })
 
-  test("fails when the tag cannot be created, keeping the answer in the cause", async () => {
+  test("fails when the tag cannot be created, keeping status and path, not the body, in the cause", async () => {
     const { fetchImpl } = github(
       missing(),
       Response.json({ message: "Reference already exists" }, { status: 422 }),
@@ -102,7 +102,7 @@ describe("moveDeployedTag", () => {
     )
     expect(error instanceof Error ? error.cause : undefined).toEqual({
       status: 422,
-      body: JSON.stringify({ message: "Reference already exists" }),
+      path: "/repos/vengex-org/platform/git/refs",
     })
   })
 })
