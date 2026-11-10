@@ -1,0 +1,44 @@
+name: setup
+description: Bun from the repo's packageManager, the bun and Nx caches, and the installs a job needs.
+
+inputs:
+  install-repo:
+    description: Install the calling repo's dependencies and restore the Nx cache.
+    required: true
+  packages-token:
+    description: Token bunfig.toml reads as VENGEX_PACKAGES_TOKEN for the @vengex-org registry.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version-file: package.json
+
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', '.ci/bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: install the ci scripts
+      shell: bash
+      working-directory: .ci
+      run: bun install --frozen-lockfile --production
+
+    - name: install the repo
+      if: inputs.install-repo == 'true'
+      shell: bash
+      env:
+        VENGEX_PACKAGES_TOKEN: ${{ inputs.packages-token }}
+      run: bun install --frozen-lockfile
+
+    # Keyed on the commit so every run saves a fresh snapshot; restore-keys take the newest one.
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      if: inputs.install-repo == 'true'
+      with:
+        path: .nx/cache
+        key: nx-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        restore-keys: nx-${{ runner.os }}-${{ runner.arch }}-

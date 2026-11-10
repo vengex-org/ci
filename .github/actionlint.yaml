@@ -1,0 +1,7 @@
+# actionlint 1.7.12 predates two 2026 Actions features this repo relies on: the job.workflow_repository /
+# job.workflow_sha context and the `$/` self-repository `uses:` syntax. Only those two messages are ignored.
+paths:
+  .github/workflows/**/*.yml:
+    ignore:
+      - 'property "workflow_(sha|repository)" is not defined in object type'
+      - 'specifying action "\$/[^"]+" in invalid format because ref is missing'

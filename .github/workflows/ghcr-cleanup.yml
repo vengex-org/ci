@@ -1,0 +1,86 @@
+name: ghcr-cleanup
+
+# Deletes old images of the repo's deployable apps from ghcr. Never deletes a buildcache tag, the
+# legacy staging/production/latest tags, or the image a deployed/<env>/<app> git tag points to.
+# Each package must grant this repo Admin under "Manage Actions access".
+
+on:
+  workflow_call:
+    inputs:
+      # Retention agreed by Roman on 2026-11-10.
+      untagged-older-than:
+        type: string
+        default: 1 day
+      tagged-older-than:
+        type: string
+        default: 30 days
+      keep-n-tagged:
+        type: number
+        default: 10
+      dry-run:
+        description: Log what would be deleted without deleting it
+        type: boolean
+        default: false
+    secrets:
+      PACKAGES_TOKEN:
+        description: Read token for the @vengex-org registry; defaults to this run's GITHUB_TOKEN
+        required: false
+
+permissions: {}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      packages: ${{ steps.excludes.outputs.packages }}
+      exclude-tags: ${{ steps.excludes.outputs.exclude-tags }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .ci
+          persist-credentials: false
+      - uses: $/actions/setup
+        with:
+          install-repo: "true"
+          packages-token: ${{ secrets.PACKAGES_TOKEN || github.token }}
+      - id: excludes
+        run: bun .ci/src/cleanup/main.ts
+
+  cleanup:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    steps:
+      - name: delete untagged images
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          owner: ${{ github.repository_owner }}
+          package: ${{ matrix.package }}
+          delete-untagged: true
+          older-than: ${{ inputs.untagged-older-than }}
+          dry-run: ${{ inputs.dry-run }}
+      - name: delete old tagged images
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          owner: ${{ github.repository_owner }}
+          package: ${{ matrix.package }}
+          keep-n-tagged: ${{ inputs.keep-n-tagged }}
+          older-than: ${{ inputs.tagged-older-than }}
+          exclude-tags: ${{ needs.plan.outputs.exclude-tags }}
+          dry-run: ${{ inputs.dry-run }}
