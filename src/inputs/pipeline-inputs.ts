@@ -12,7 +12,8 @@ const jsonInput = <T extends z.ZodType>(schema: T) =>
     .string()
     .transform((text, ctx) => {
       try {
-        return JSON.parse(text) as unknown
+        const value: unknown = JSON.parse(text)
+        return value
       } catch {
         ctx.addIssue({ code: "custom", message: "not JSON" })
         return z.NEVER
@@ -30,10 +31,15 @@ const postgresSchema = z
   })
   .strict()
 
+const postgresInputSchema = z.union([
+  z.literal("").transform(() => undefined),
+  jsonInput(postgresSchema),
+])
+
 const rawInputsSchema = z
   .object({
     environments: jsonInput(strictRecord(refName, z.enum(ENVIRONMENT_TRIGGERS))),
-    postgres: z.union([z.literal("").transform(() => undefined), jsonInput(postgresSchema)]),
+    postgres: postgresInputSchema,
     "checks-timeout": minutes,
     "wait-timeout": minutes,
     "build-timeout": minutes,
@@ -85,4 +91,17 @@ export function parsePipelineInputs(raw: Record<string, string>): PipelineInputs
       release: inputs["release-timeout"],
     },
   }
+}
+
+/** The `postgres` input alone, for the checks job that starts the database. */
+export function parsePostgresInput(text: string): PostgresService | undefined {
+  const parsed = postgresInputSchema.safeParse(text)
+  if (!parsed.success) {
+    throw new Error(
+      `invalid postgres input
+${z.prettifyError(parsed.error)}`,
+      { cause: parsed.error },
+    )
+  }
+  return parsed.data
 }
