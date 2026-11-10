@@ -3,7 +3,7 @@ description: Bun from the repo's packageManager, the bun and Nx caches, and the 
 
 inputs:
   install-repo:
-    description: Install the calling repo's dependencies and restore the Nx cache.
+    description: Install the calling repo's dependencies.
     required: true
   packages-token:
     description: Token bunfig.toml reads as VENGEX_PACKAGES_TOKEN for the @vengex-org registry.
@@ -42,11 +42,3 @@ runs:
       env:
         VENGEX_PACKAGES_TOKEN: ${{ inputs.packages-token }}
       run: bun install --frozen-lockfile
-
-    # Keyed on the commit so every run saves a fresh snapshot; restore-keys take the newest one.
-    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      if: inputs.install-repo == 'true'
-      with:
-        path: .nx/cache
-        key: nx-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-        restore-keys: nx-${{ runner.os }}-${{ runner.arch }}-
