@@ -28,6 +28,7 @@ on:
         type: string
         default: lint format:check typecheck test build
       coolify-url:
+        description: Coolify base URL; required when any environment is declared
         type: string
         default: ""
       # Starting guesses (Roman, 2026-11-10): checks ~7x the longest run seen (4 min); the wait outlasts
@@ -54,11 +55,11 @@ on:
       COOLIFY_READ_TOKEN:
         description: Read-only Coolify token for the pull request preflight
         required: false
+      # Declared but never passed by the caller: the `release` job runs in the deploy environment, where
+      # GitHub takes them from that environment's secrets, which pull request runs cannot read.
       COOLIFY_TOKEN:
-        description: Deploy token; keep it as an environment secret of each deploy environment
         required: false
       SENTRY_AUTH_TOKEN:
-        description: Source map upload during release builds; environment secret
         required: false
 
 permissions: {}
@@ -113,13 +114,14 @@ jobs:
           fi
           echo "$PROJECTS" | jq -e 'type == "array"' >/dev/null
           echo "affected ($NX_BASE..$NX_HEAD): $PROJECTS" >> "$GITHUB_STEP_SUMMARY"
-          echo "json=$PROJECTS" >> "$GITHUB_OUTPUT"
+          echo "json=$(echo "$PROJECTS" | jq -c .)" >> "$GITHUB_OUTPUT"
           echo "projects=$(echo "$PROJECTS" | jq -r 'join(",")')" >> "$GITHUB_OUTPUT"
       - run: bunx nx graph --file=.nx-graph.json
       - name: plan the image builds and deploys
         id: plan
         env:
           PIPELINE_INPUT_ENVIRONMENTS: ${{ inputs.environments }}
+          PIPELINE_INPUT_COOLIFY_URL: ${{ inputs.coolify-url }}
           PIPELINE_INPUT_POSTGRES: ${{ inputs.postgres }}
           PIPELINE_INPUT_CHECKS_TIMEOUT: ${{ inputs.checks-timeout }}
           PIPELINE_INPUT_WAIT_TIMEOUT: ${{ inputs.wait-timeout }}
@@ -130,9 +132,11 @@ jobs:
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           NX_AFFECTED_JSON: ${{ steps.affected.outputs.json }}
           NX_GRAPH_FILE: .nx-graph.json
-        run: bun .ci/src/plan/main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/plan/main.ts
 
+  # src/image/wait-for-checks.ts finds this job by its name.
   checks:
+    name: pipeline-checks
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.checks-timeout }}
@@ -157,7 +161,7 @@ jobs:
         if: inputs.postgres != ''
         env:
           POSTGRES: ${{ inputs.postgres }}
-        run: bun .ci/src/checks/postgres-main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/checks/postgres-main.ts
       - name: repo setup
         if: inputs.setup != ''
         env:
@@ -230,7 +234,7 @@ jobs:
           LEG_KIND: build
           LEG_JSON: ${{ toJSON(matrix.leg) }}
           REPO_VARS_JSON: ${{ toJSON(vars) }}
-        run: bun .ci/src/image/build-args-main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/image/build-args-main.ts
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
@@ -244,7 +248,7 @@ jobs:
           platforms: ${{ matrix.leg.platform }}
           build-args: ${{ steps.args.outputs.build-args }}
           secrets: |
-            vengex_packages_token=${{ secrets.PACKAGES_TOKEN || github.token }}
+            ${{ contains(matrix.leg.secrets, 'packages') && format('vengex_packages_token={0}', secrets.PACKAGES_TOKEN || github.token) || '' }}
           cache-from: type=registry,ref=${{ matrix.leg.image }}:buildcache-${{ matrix.leg.environment }}
           push: false
       - name: check the coolify resources (read only)
@@ -257,7 +261,7 @@ jobs:
             echo "::warning::COOLIFY_READ_TOKEN is not set, the coolify preflight did not run"
             exit 0
           fi
-          bun .ci/src/deploy/preflight-main.ts
+          bun --config=.ci/bunfig.toml .ci/src/deploy/preflight-main.ts
 
   # Push to master or a dispatch on master: build, wait for this run's checks, push, deploy, move the tag.
   release:
@@ -308,7 +312,7 @@ jobs:
           LEG_KIND: release
           LEG_JSON: ${{ toJSON(matrix.leg) }}
           REPO_VARS_JSON: ${{ toJSON(vars) }}
-        run: bun .ci/src/image/build-args-main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/image/build-args-main.ts
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
@@ -323,15 +327,15 @@ jobs:
           platforms: ${{ matrix.leg.platform }}
           build-args: ${{ steps.args.outputs.build-args }}
           secrets: |
-            vengex_packages_token=${{ secrets.PACKAGES_TOKEN || github.token }}
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+            ${{ contains(matrix.leg.secrets, 'packages') && format('vengex_packages_token={0}', secrets.PACKAGES_TOKEN || github.token) || '' }}
+            ${{ contains(matrix.leg.secrets, 'sentry') && format('sentry_auth_token={0}', secrets.SENTRY_AUTH_TOKEN) || '' }}
           cache-from: type=registry,ref=${{ matrix.leg.image }}:buildcache-${{ matrix.leg.environment }}
           push: false
       - name: wait for this run's checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
           WAIT_TIMEOUT_MINUTES: ${{ inputs.wait-timeout }}
-        run: bun .ci/src/image/wait-main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/image/wait-main.ts
       # Same builder and inputs as the build above: every layer is cached, so this only exports and pushes.
       - name: push the image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -341,8 +345,8 @@ jobs:
           platforms: ${{ matrix.leg.platform }}
           build-args: ${{ steps.args.outputs.build-args }}
           secrets: |
-            vengex_packages_token=${{ secrets.PACKAGES_TOKEN || github.token }}
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+            ${{ contains(matrix.leg.secrets, 'packages') && format('vengex_packages_token={0}', secrets.PACKAGES_TOKEN || github.token) || '' }}
+            ${{ contains(matrix.leg.secrets, 'sentry') && format('sentry_auth_token={0}', secrets.SENTRY_AUTH_TOKEN) || '' }}
           cache-from: type=registry,ref=${{ matrix.leg.image }}:buildcache-${{ matrix.leg.environment }}
           cache-to: type=registry,ref=${{ matrix.leg.image }}:buildcache-${{ matrix.leg.environment }},mode=max,image-manifest=true
           provenance: false
@@ -355,4 +359,4 @@ jobs:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
           COOLIFY_DEPLOY_TIMEOUT_MINUTES: ${{ inputs.deploy-timeout }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: bun .ci/src/deploy/release-main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/deploy/release-main.ts

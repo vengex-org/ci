@@ -54,7 +54,7 @@ jobs:
           install-repo: "true"
           packages-token: ${{ secrets.PACKAGES_TOKEN || github.token }}
       - id: excludes
-        run: bun .ci/src/cleanup/main.ts
+        run: bun --config=.ci/bunfig.toml .ci/src/cleanup/main.ts
 
   cleanup:
     needs: plan
