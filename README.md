@@ -52,13 +52,13 @@ What one run does:
 - `prepare` finds the affected Nx projects. The base is the last green run on master, or the merge
   base for a pull request. With no green run yet, every project counts as affected. It then plans
   which apps to build and deploy.
-- `checks` runs `inputs.targets` (default `lint format:check typecheck test build`) on the
+- `pipeline-checks` runs `inputs.targets` (default `lint format:check typecheck test build`) on the
   affected projects. Repo-specific checks belong in Nx targets, so the workflow stays the same in
   every repo.
 - `build` runs for pull requests from the same repository. It builds the image of every affected
   app without pushing it, and checks the app's Coolify resources with a read-only token.
 - `release` runs for a push to master or a dispatch on master. It builds the image on a native
-  runner and waits for this run's `checks` job. Once the checks pass, it pushes
+  runner and waits for this run's `pipeline-checks` job. Once the checks pass, it pushes
   `<image>:<env>-<sha>`, deploy it to Coolify, wait for the result and the health check, and move
   the git tag `deployed/<env>/<app>`.
 

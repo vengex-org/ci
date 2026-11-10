@@ -11,7 +11,7 @@ export async function runCommand(
   ])
   if (exitCode !== 0) {
     throw new Error(`command failed: ${command[0]}`, {
-      cause: { command, exitCode, stderr: stderr.trim() },
+      cause: { command: commandName(command), exitCode, stderr: stderr.trim() },
     })
   }
   return stdout
@@ -27,8 +27,13 @@ export async function runCheck(
   if (exitCode === 0) return true
   if (exitCode === 1) return false
   throw new Error(`command failed: ${command[0]}`, {
-    cause: { command, exitCode, stderr: stderr.trim() },
+    cause: { command: commandName(command), exitCode, stderr: stderr.trim() },
   })
+}
+
+/** The program and subcommand only: later arguments can carry credentials (`POSTGRES_PASSWORD=`). */
+function commandName(command: [string, ...string[]]): string {
+  return command.slice(0, 2).join(" ")
 }
 
 function cwdOption(options: { cwd?: string }): { cwd?: string } {
