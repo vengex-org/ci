@@ -24,7 +24,8 @@ on:
         required: true
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # The event is part of the group, so a push never replaces a pending production dispatch.
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
