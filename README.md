@@ -43,9 +43,9 @@ jobs:
     secrets:
       PACKAGES_TOKEN: ${{ secrets.VENGEX_PACKAGES_TOKEN }}
       COOLIFY_READ_TOKEN: ${{ secrets.COOLIFY_READ_TOKEN }}
-      # Only release runs (push or dispatch on master) deploy; a pull request run gets no deploy token.
-      COOLIFY_TOKEN: ${{ github.event_name != 'pull_request' && secrets.COOLIFY_TOKEN || '' }}
-      SENTRY_AUTH_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SENTRY_AUTH_TOKEN || '' }}
+      # Only runs on master (push or dispatch) deploy; pull requests and other refs get no deploy token.
+      COOLIFY_TOKEN: ${{ github.ref == 'refs/heads/master' && secrets.COOLIFY_TOKEN || '' }}
+      SENTRY_AUTH_TOKEN: ${{ github.ref == 'refs/heads/master' && secrets.SENTRY_AUTH_TOKEN || '' }}
 ```
 
 The deploy tokens have to be repository secrets. A job of a workflow called from another repository
