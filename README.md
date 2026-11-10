@@ -58,7 +58,7 @@ What one run does:
 - `build` runs for pull requests from the same repository. It builds the image of every affected
   app without pushing it, and checks the app's Coolify resources with a read-only token.
 - `release` runs for a push to master or a dispatch on master. It builds the image on a native
-  runner and waits for this run's `checks` job. Only after the checks pass does it push
+  runner and waits for this run's `checks` job. Once the checks pass, it pushes
   `<image>:<env>-<sha>`, deploy it to Coolify, wait for the result and the health check, and move
   the git tag `deployed/<env>/<app>`.
 
@@ -109,8 +109,8 @@ this block, with no workflow change:
 - `prebuild` is an Nx target run on the runner before `docker build`.
 - `secrets` lists the BuildKit secrets the Dockerfile mounts:
   - `packages` is mounted as `vengex_packages_token`.
-  - `sentry` is mounted as `sentry_auth_token`. It is empty in pull request builds, so the
-    Dockerfile must skip the upload when the value is empty.
+  - `sentry` is mounted as `sentry_auth_token`. Pull request builds do not mount it, so the
+    Dockerfile must treat it as optional and skip the upload without it.
 - Every build gets the build args `BUN_VERSION` (from `packageManager`), `ENVIRONMENT` and
   `GIT_COMMIT`. `${vars.NAME}` reads a repository variable. Never put a secret there: build
   args end up in the image and the logs.
@@ -152,7 +152,7 @@ jobs:
   - `buildcache-*` tags.
   - The old `staging`, `production` and `latest` tags.
   - Every image a `deployed/<env>/<app>` tag points to.
-- Without any deployed tag the run fails rather than guess.
+- With no deployed tag at all the run fails, since it cannot tell which images are live.
 - Each package must grant the repository Admin under "Manage Actions access".
 - Run with `dry-run: true` first.
 
