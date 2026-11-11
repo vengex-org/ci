@@ -1,5 +1,5 @@
 name: setup
-description: Bun from the repo's packageManager, the bun and Nx caches, and the installs a job needs.
+description: Bun from the repo's packageManager, the bun install cache, and the installs a job needs.
 
 inputs:
   install-repo:
