@@ -29,7 +29,8 @@ runs:
     - name: use the persistent nx cache
       if: runner.environment == 'self-hosted'
       shell: bash
-      run: |
+      # The only value written is GITHUB_REPOSITORY, which GitHub sets and which holds no newline.
+      run: | # zizmor: ignore[github-env]
         if [ -d /nx ]; then
           echo "NX_CACHE_DIRECTORY=/nx/$GITHUB_REPOSITORY/cache" >> "$GITHUB_ENV"
           echo "NX_WORKSPACE_DATA_DIRECTORY=/nx/$GITHUB_REPOSITORY/workspace-data" >> "$GITHUB_ENV"
