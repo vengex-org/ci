@@ -29,6 +29,10 @@ export async function startPostgres(service: PostgresService, deps: PostgresDeps
     `pg_isready -U ${service.user}`,
     "--health-interval",
     "2s",
+    // Without a start period Docker marks the container unhealthy after three failed probes (6 s),
+    // while initdb on a slow runner takes longer; probes inside the period do not count.
+    "--health-start-period",
+    "60s",
     service.image,
   ])
   for (let attempt = 1; attempt <= deps.attempts; attempt++) {
