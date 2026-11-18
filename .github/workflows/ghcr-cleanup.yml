@@ -30,7 +30,8 @@ permissions: {}
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    # Self-hosted when the caller's repository or organization sets the RUNNER variable (README, Runners).
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -58,7 +59,8 @@ jobs:
 
   cleanup:
     needs: plan
-    runs-on: ubuntu-latest
+    # Self-hosted when the caller's repository or organization sets the RUNNER variable (README, Runners).
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       packages: write
