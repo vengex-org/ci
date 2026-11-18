@@ -139,8 +139,9 @@ this block, with no workflow change:
 ## Runners
 
 `prepare` and `pipeline-checks` (and both jobs of the image cleanup) run on `ubuntu-latest` unless
-the caller's repository or organization sets the Actions variable `RUNNER` to a runner label, e.g.
-`gaming-pc`. While the variable is set and no such runner is online, these jobs wait in the queue
+the caller's repository sets the Actions variable `RUNNER` to a runner label, e.g. `gaming-pc`. It has
+to be a repository variable: an organization variable does not reach these workflows when another
+repository calls them. While the variable is set and no such runner is online, these jobs wait in the queue
 (GitHub cancels them after 24 hours) and nothing after them runs, so unset the variable before the
 machine goes offline; the next run then uses GitHub-hosted runners. `build` and `release` always run
 on the native runner of the app's platform.
