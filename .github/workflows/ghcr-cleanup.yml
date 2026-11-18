@@ -30,7 +30,7 @@ permissions: {}
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -58,7 +58,7 @@ jobs:
 
   cleanup:
     needs: plan
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       packages: write

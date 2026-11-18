@@ -1,5 +1,5 @@
 name: setup
-description: Bun from the repo's packageManager, the bun install cache, and the installs a job needs.
+description: Bun from the repo's packageManager, the bun install cache, the Nx cache on a self-hosted runner, and the installs a job needs.
 
 inputs:
   install-repo:
@@ -23,6 +23,18 @@ runs:
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version-file: package.json
+
+    # Nx 24 finds a cache entry only through the index in its workspace data, so both directories persist
+    # together, one pair per repository. Only a self-hosted runner that mounts /nx has them.
+    - name: use the persistent nx cache
+      if: runner.environment == 'self-hosted'
+      shell: bash
+      # The only value written is GITHUB_REPOSITORY, which GitHub sets and which holds no newline.
+      run: | # zizmor: ignore[github-env]
+        if [ -d /nx ]; then
+          echo "NX_CACHE_DIRECTORY=/nx/$GITHUB_REPOSITORY/cache" >> "$GITHUB_ENV"
+          echo "NX_WORKSPACE_DATA_DIRECTORY=/nx/$GITHUB_REPOSITORY/workspace-data" >> "$GITHUB_ENV"
+        fi
 
     - id: bun-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
