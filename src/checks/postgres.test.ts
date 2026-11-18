@@ -52,6 +52,8 @@ describe("startPostgres", () => {
       "pg_isready -U vengex",
       "--health-interval",
       "2s",
+      "--health-start-period",
+      "60s",
       "postgres:18-alpine",
     ])
     expect(docker.calls.filter((command) => command[1] === "inspect")).toHaveLength(2)
