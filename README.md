@@ -140,9 +140,10 @@ this block, with no workflow change:
 
 `prepare` and `pipeline-checks` (and both jobs of the image cleanup) run on `ubuntu-latest` unless
 the caller's repository or organization sets the Actions variable `RUNNER` to a runner label, e.g.
-`gaming-pc`. Unset the variable and the next run goes back to GitHub-hosted runners, so a switched-off
-machine never leaves jobs queued. `build` and `release` always run on the native runner of the app's
-platform.
+`gaming-pc`. While the variable is set and no such runner is online, these jobs wait in the queue
+(GitHub cancels them after 24 hours) and nothing after them runs, so unset the variable before the
+machine goes offline; the next run then uses GitHub-hosted runners. `build` and `release` always run
+on the native runner of the app's platform.
 
 A self-hosted runner needs Docker for the Postgres the checks start, published on its `localhost`.
 When it mounts `/nx`, `actions/setup` keeps the Nx cache and workspace data in
