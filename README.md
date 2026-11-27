@@ -149,20 +149,24 @@ machine goes offline; the next run then uses GitHub-hosted runners.
 `linux/arm64`, `ubuntu-latest` for `linux/amd64`) unless the caller's repository sets the Actions
 variable `BUILD_RUNNER`, again a repository variable. When it is set, both jobs run on that label and
 set up QEMU first, so an x64 machine can build `linux/arm64` images. An emulated build is several
-times slower than a native one, so raise `build-timeout` and `release-timeout` to match. A
-`release` waits on that runner for this run's `pipeline-checks`; when `RUNNER` names the same
-machine, register at least two runner instances under the label, or the release holds the only one
-until `wait-timeout` while the checks stay queued.
+times slower than a native one, so raise `build-timeout` and `release-timeout` to match. With
+`BUILD_RUNNER` set, the release runs as the job `release-after-checks`, which starts only after
+`pipeline-checks` passed instead of building while the checks run. Release jobs that waited on the
+runners would otherwise keep the checks queued when both variables name the same machine.
 
 A self-hosted runner needs Docker for the Postgres the checks start, published on its `localhost`.
 When it mounts `/nx`, `actions/setup` keeps the Nx cache and workspace data in
 `/nx/<owner>/<repo>/`, so later runs read unchanged targets from the cache. Every job that runs there,
 pull requests included, writes to that cache, so give such a runner only to repositories whose
-pull requests come from people with write access.
+pull requests come from people with write access. With `BUILD_RUNNER`, `build` also runs a pull
+request's own Dockerfile on that machine, which has QEMU registered in its kernel. `release`
+builds its `prebuild` without the Nx cache, so nothing a pull request wrote reaches a pushed image.
 
-On a self-hosted runner `build` and `release` remove their buildx builder at the end of the job, and
-`docker/login-action` logs out of ghcr; layers come from the registry build cache on the next run.
-QEMU stays registered on the machine, which later jobs do not notice.
+On a self-hosted runner `build` and `release` set `DOCKER_CONFIG` to the job's temp directory, so
+jobs running side by side on one machine keep their buildx builder and ghcr login apart. Docker's
+CLI plugins must then be installed system wide or in `~/.docker/cli-plugins`, which the job links
+in. Each job removes its builder at the end; layers come from the registry build cache on the next
+run. QEMU stays registered on the machine.
 
 ## Image cleanup
 
