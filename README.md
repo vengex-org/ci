@@ -143,14 +143,26 @@ the caller's repository sets the Actions variable `RUNNER` to a runner label, e.
 to be a repository variable: an organization variable does not reach these workflows when another
 repository calls them. While the variable is set and no such runner is online, these jobs wait in the queue
 (GitHub cancels them after 24 hours) and nothing after them runs, so unset the variable before the
-machine goes offline; the next run then uses GitHub-hosted runners. `build` and `release` always run
-on the native runner of the app's platform.
+machine goes offline; the next run then uses GitHub-hosted runners.
+
+`build` and `release` run on the native runner of the app's platform (`ubuntu-24.04-arm` for
+`linux/arm64`, `ubuntu-latest` for `linux/amd64`) unless the caller's repository sets the Actions
+variable `BUILD_RUNNER`, again a repository variable. When it is set, both jobs run on that label and
+set up QEMU first, so an x64 machine can build `linux/arm64` images. An emulated build is several
+times slower than a native one, so raise `build-timeout` and `release-timeout` to match. A
+`release` waits on that runner for this run's `pipeline-checks`; when `RUNNER` names the same
+machine, register at least two runner instances under the label, or the release holds the only one
+until `wait-timeout` while the checks stay queued.
 
 A self-hosted runner needs Docker for the Postgres the checks start, published on its `localhost`.
 When it mounts `/nx`, `actions/setup` keeps the Nx cache and workspace data in
 `/nx/<owner>/<repo>/`, so later runs read unchanged targets from the cache. Every job that runs there,
 pull requests included, writes to that cache, so give such a runner only to repositories whose
 pull requests come from people with write access.
+
+On a self-hosted runner `build` and `release` remove their buildx builder at the end of the job, and
+`docker/login-action` logs out of ghcr; layers come from the registry build cache on the next run.
+QEMU stays registered on the machine, which later jobs do not notice.
 
 ## Image cleanup
 
